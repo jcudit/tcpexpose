@@ -18,7 +18,7 @@ struct ipv4_data_t {
     u64 saddr;
     u64 daddr;
     u64 ip;
-    u64 dport;
+    u64 ports;
     u64 delta_us;
     char task[TASK_COMM_LEN];
 
@@ -55,7 +55,7 @@ struct ipv6_data_t {
     unsigned __int128 saddr;
     unsigned __int128 daddr;
     u64 ip;
-    u64 dport;
+    u64 ports;
     u64 delta_us;
     char task[TASK_COMM_LEN];
 };
@@ -82,11 +82,13 @@ int trace_tcp_rcv_established(struct pt_regs *ctx, struct sock *sk)
     u64 now = bpf_ktime_get_ns();
 
     // pull in details
-    u16 family = 0, dport = 0;
+    u16 family = 0;
+    u16 dport = sk->__sk_common.skc_dport;
+    u16 lport = sk->__sk_common.skc_num;
+
     struct sock *skp = NULL;
     bpf_probe_read(&skp, sizeof(skp), &sk);
     bpf_probe_read(&family, sizeof(family), &skp->__sk_common.skc_family);
-    bpf_probe_read(&dport, sizeof(dport), &skp->__sk_common.skc_dport);
 
     struct tcp_sock *tp = (struct tcp_sock *)sk;
 
@@ -125,7 +127,7 @@ int trace_tcp_rcv_established(struct pt_regs *ctx, struct sock *sk)
             &skp->__sk_common.skc_rcv_saddr);
         bpf_probe_read(&data4.daddr, sizeof(u32),
             &skp->__sk_common.skc_daddr);
-        data4.dport = ntohs(dport);
+        data4.ports = ntohs(dport) + ((0ULL + lport) << 32);
         data4.delta_us = (now - ts) / 1000;
         __builtin_memcpy(&data4.task, infop->task, sizeof(data4.task));
         ipv4_events.perf_submit(ctx, &data4, sizeof(data4));
@@ -137,7 +139,7 @@ int trace_tcp_rcv_established(struct pt_regs *ctx, struct sock *sk)
             &skp->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
         bpf_probe_read(&data6.daddr, sizeof(data6.daddr),
             &skp->__sk_common.skc_v6_daddr.in6_u.u6_addr32);
-        data6.dport = ntohs(dport);
+        data6.ports = ntohs(dport) + ((0ULL + lport) << 32);
         data6.delta_us = (now - ts) / 1000;
         __builtin_memcpy(&data6.task, infop->task, sizeof(data6.task));
         ipv6_events.perf_submit(ctx, &data6, sizeof(data6));
@@ -161,11 +163,14 @@ int trace_tcp_set_state(struct pt_regs *ctx, struct sock *sk, int newstate)
     u64 now = bpf_ktime_get_ns();
 
     // pull in details
-    u16 family = 0, dport = 0;
+    u16 family = 0;
+    u16 dport = sk->__sk_common.skc_dport;
+    u16 lport = sk->__sk_common.skc_num;
+
     struct sock *skp = NULL;
     bpf_probe_read(&skp, sizeof(skp), &sk);
     bpf_probe_read(&family, sizeof(family), &skp->__sk_common.skc_family);
-    bpf_probe_read(&dport, sizeof(dport), &skp->__sk_common.skc_dport);
+
 
     struct tcp_sock *tp = (struct tcp_sock *)sk;
 
@@ -204,7 +209,7 @@ int trace_tcp_set_state(struct pt_regs *ctx, struct sock *sk, int newstate)
             &skp->__sk_common.skc_rcv_saddr);
         bpf_probe_read(&data4.daddr, sizeof(u32),
             &skp->__sk_common.skc_daddr);
-        data4.dport = ntohs(dport);
+        data4.ports = ntohs(dport) + ((0ULL + lport) << 32);
         data4.delta_us = (now - ts) / 100;
         __builtin_memcpy(&data4.task, infop->task, sizeof(data4.task));
         ipv4_events.perf_submit(ctx, &data4, sizeof(data4));
@@ -216,7 +221,7 @@ int trace_tcp_set_state(struct pt_regs *ctx, struct sock *sk, int newstate)
             &skp->__sk_common.skc_v6_rcv_saddr.in6_u.u6_addr32);
         bpf_probe_read(&data6.daddr, sizeof(data6.daddr),
             &skp->__sk_common.skc_v6_daddr.in6_u.u6_addr32);
-        data6.dport = ntohs(dport);
+        data6.ports = ntohs(dport) + ((0ULL + lport) << 32);
         data6.delta_us = (now - ts) / 1000;
         __builtin_memcpy(&data6.task, infop->task, sizeof(data6.task));
         ipv6_events.perf_submit(ctx, &data6, sizeof(data6));
