@@ -40,8 +40,7 @@ class BPFManager(object):
             event="tcp_rcv_established",
             fn_name="trace_tcp_rcv_established"
         )
-        b["ipv4_events"].open_perf_buffer(_print_ipv4_event)
-        b["ipv6_events"].open_perf_buffer(_print_ipv6_event)
+        b["events"].open_perf_buffer(_print_event)
         return b
 
     async def run(self):
@@ -52,33 +51,23 @@ class BPFManager(object):
         while True:
             await self.loop.run_in_executor(None, self.bpf.kprobe_poll)
 
-def _print_ipv4_event(cpu, data, size):
-    event = ct.cast(data, ct.POINTER(Data_ipv4)).contents
+def _print_event(cpu, data, size):
+    event = ct.cast(data, ct.POINTER(Event)).contents
     print("%-6d %-12.12s %-2d %-16s %-16s %-5d %.2f" % (event.pid, event.task,
-        event.ip, inet_ntop(AF_INET, pack("I", event.saddr)),
-        # inet_ntop(AF_INET, pack("I", event.daddr)), event.ports >> 32,
-        inet_ntop(AF_INET, pack("I", event.daddr)), event.ports & 0xffffffff,
+        event.ip, inet_ntop(AF_INET6, event.saddr),
+        inet_ntop(AF_INET6, event.daddr), event.ports & 0xffffffff,
         float(event.delta_us) / 1000))
     # print('{0} {1} {2} {3} {4} {5}'.format(event.rx_b / 1024, event.tx_b / 1024, event.segs_out, event.segs_in, event.rcv_tstamp, event.lsndtime))
     # print('{0} {1} {2} {3} {4}'.format(event.snd_wl1, event.snd_wnd, event.max_window, event.mss_cache, event.window_clamp))
     # print('{0} {1} {2} {3} {4}'.format(event.rcv_ssthresh, event.packets_out, event.retrans_out, event.max_packets_out, event.max_packets_seq))
     # print('{0} {1} {2}'.format(event.srtt_us, event.mdev_us, event.mdev_max_us))
 
-
-def _print_ipv6_event(cpu, data, size):
-    event = ct.cast(data, ct.POINTER(Data_ipv6)).contents
-    print("%-6d %-12.12s %-2d %-16s %-16s %-5d %.2f" % (event.pid, event.task,
-        event.ip, inet_ntop(AF_INET6, event.saddr),
-        inet_ntop(AF_INET6, event.daddr), event.ports >> 32,
-        float(event.delta_us) / 1000))
-
-
-class Data_ipv4(ct.Structure):
+class Event(ct.Structure):
     _fields_ = [
         ("ts_us", ct.c_ulonglong),
         ("pid", ct.c_ulonglong),
-        ("saddr", ct.c_ulonglong),
-        ("daddr", ct.c_ulonglong),
+        ("saddr", ct.c_ulonglong * 2),
+        ("daddr", ct.c_ulonglong * 2),
         ("ip", ct.c_ulonglong),
         ("ports", ct.c_ulonglong),
         ("delta_us", ct.c_ulonglong),
@@ -106,18 +95,4 @@ class Data_ipv4(ct.Structure):
         ("mdev_us", ct.c_ulonglong),
         ("mdev_max_us", ct.c_ulonglong),
         # Congestion
-    ]
-
-
-class Data_ipv6(ct.Structure):
-    _fields_ = [
-        ("ts_us", ct.c_ulonglong),
-        ("pid", ct.c_ulonglong),
-        ("saddr", (ct.c_ulonglong * 2)),
-        ("daddr", (ct.c_ulonglong * 2)),
-        ("ip", ct.c_ulonglong),
-        ("ports", ct.c_ulonglong),
-        ("sport", ct.c_ulonglong),
-        ("delta_us", ct.c_ulonglong),
-        ("task", ct.c_char * TASK_COMM_LEN)
     ]
