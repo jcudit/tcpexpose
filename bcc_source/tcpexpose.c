@@ -80,6 +80,7 @@ int trace_tcp_rcv_established(struct pt_regs *ctx, struct sock *sk)
     struct tcp_sock *tp = (struct tcp_sock *)sk;
 
     struct event_data_t event = {
+        // TODO: Fix family value - currently incorrect
         .pid = infop->pid, .ip = family,
 
         // Throughput
@@ -121,6 +122,7 @@ int trace_tcp_rcv_established(struct pt_regs *ctx, struct sock *sk)
     return 0;
 };
 
+// TODO: Send appropriate event
 int trace_tcp_set_state(struct pt_regs *ctx, struct sock *sk, int newstate)
 {
 
