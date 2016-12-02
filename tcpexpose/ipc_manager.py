@@ -24,7 +24,8 @@ class IPCManager(object):
         while True:
             (action, quartet) = await self.mailbox.get()
             if action == 'register':
-                print('received')
+                pass
+                # print('received')
                 # self.traces[q] = []
             elif action == 'unregister':
                 del self.traces[q]

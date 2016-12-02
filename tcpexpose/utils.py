@@ -11,7 +11,7 @@ class BaseEvent(ct.Structure):
         ("pid", ct.c_ulonglong),
         ("saddr", ct.c_ulonglong * 2),
         ("daddr", ct.c_ulonglong * 2),
-        ("ip", ct.c_ulonglong),
+        ("event_type", ct.c_ulonglong),
         ("ports", ct.c_ulonglong),
         ("delta_us", ct.c_ulonglong),
         ("task", ct.c_char * TASK_COMM_LEN),

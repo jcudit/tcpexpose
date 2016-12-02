@@ -4,6 +4,12 @@
 #include <net/sock.h>
 #include <bcc/proto.h>
 
+enum {
+    REGISTER,
+    UNREGISTER,
+    PUBLISH,
+};
+
 struct info_t {
     u64 ts;
     u64 pid;
@@ -16,7 +22,7 @@ struct event_data_t {
     u64 pid;
     unsigned __int128 saddr;
     unsigned __int128 daddr;
-    u64 ip;
+    u64 event_type;
     u64 ports;
     u64 delta_us;
     char task[TASK_COMM_LEN];
@@ -48,16 +54,6 @@ struct event_data_t {
 };
 BPF_PERF_OUTPUT(events);
 
-int trace_connect(struct pt_regs *ctx, struct sock *sk)
-{
-    u32 pid = bpf_get_current_pid_tgid();
-    struct info_t info = {.pid = pid};
-    info.ts = bpf_ktime_get_ns();
-    bpf_get_current_comm(&info.task, sizeof(info.task));
-    start.update(&sk, &info);
-    return 0;
-};
-
 int trace_tcp_rcv_established(struct pt_regs *ctx, struct sock *sk)
 {
     // check start and calculate delta
@@ -80,8 +76,7 @@ int trace_tcp_rcv_established(struct pt_regs *ctx, struct sock *sk)
     struct tcp_sock *tp = (struct tcp_sock *)sk;
 
     struct event_data_t event = {
-        // TODO: Fix family value - currently incorrect
-        .pid = infop->pid, .ip = family,
+        .pid = infop->pid, .event_type = PUBLISH,
 
         // Throughput
         .rx_b = tp->bytes_received,
@@ -122,36 +117,50 @@ int trace_tcp_rcv_established(struct pt_regs *ctx, struct sock *sk)
     return 0;
 };
 
-// TODO: Send appropriate event
 int trace_tcp_set_state(struct pt_regs *ctx, struct sock *sk, int newstate)
 {
 
-    if (sk->__sk_common.skc_state != TCP_ESTABLISHED) {
+    if (
+        // Transitions out of ESTABLISHED are closing connections
+        sk->__sk_common.skc_state != TCP_ESTABLISHED &&
+        // Transitions to ESTABLISHED are opening connections
+        newstate != TCP_ESTABLISHED
+    ) {
+        // Pass on event if neither opening or closing
         return 0;
     }
 
-    // check start and calculate delta
+    // Recover socket state if already tracking
     struct info_t *infop = start.lookup(&sk);
     if (infop == 0) {
-        return 0;   // missed entry or filtered
+        // Begin tracking state if currently untracked
+        u32 pid = bpf_get_current_pid_tgid();
+        struct info_t newinfo = {.pid = pid};
+        newinfo.ts = bpf_ktime_get_ns();
+        bpf_get_current_comm(&newinfo.task, sizeof(newinfo.task));
+        start.update(&sk, &newinfo);
+        infop = &newinfo;
     }
     u64 ts = infop->ts;
     u64 now = bpf_ktime_get_ns();
 
+    u64 event_type;
+    if (newstate == TCP_ESTABLISHED) {
+        event_type = REGISTER;
+    } else {
+        event_type = UNREGISTER;
+    }
+
     // pull in details
-    u16 family = 0;
     u16 dport = sk->__sk_common.skc_dport;
     u16 lport = sk->__sk_common.skc_num;
 
     struct sock *skp = NULL;
     bpf_probe_read(&skp, sizeof(skp), &sk);
-    bpf_probe_read(&family, sizeof(family), &skp->__sk_common.skc_family);
-
-
     struct tcp_sock *tp = (struct tcp_sock *)sk;
 
     struct event_data_t event = {
-        .pid = infop->pid, .ip = 3,
+        .pid = infop->pid, .event_type = event_type,
 
         // Throughput
         .rx_b = tp->bytes_received,

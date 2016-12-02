@@ -36,8 +36,6 @@ class BPFManager(object):
         '''
         bpf_text = self._render_source()
         b = BPF(text=bpf_text)
-        b.attach_kprobe(event="tcp_v4_connect", fn_name="trace_connect")
-        b.attach_kprobe(event="tcp_v6_connect", fn_name="trace_connect")
         b.attach_kprobe(event="tcp_set_state", fn_name="trace_tcp_set_state")
         b.attach_kprobe(
             event="tcp_rcv_established",
@@ -61,7 +59,7 @@ class BPFManager(object):
 def _receive_event(ipc_manager_mailbox, cpu, data, size):
     ev = ct.cast(data, ct.POINTER(BaseEvent)).contents
     line = "%-6d %-12.12s %-2d %-16s %-16s %-5d %.2f" % \
-        (ev.pid, ev.task, ev.ip, inet_ntop(AF_INET6, ev.saddr),
+        (ev.pid, ev.task, ev.event_type, inet_ntop(AF_INET6, ev.saddr),
         inet_ntop(AF_INET6, ev.daddr), ev.ports & 0xffffffff,
         float(ev.delta_us) / 1000)
     logging.info(line)
