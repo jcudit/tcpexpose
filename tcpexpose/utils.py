@@ -1,9 +1,20 @@
 from collections import namedtuple
+from enum import Enum
 import ctypes as ct
+from socket import inet_ntop, AF_INET6
 
 TASK_COMM_LEN = 16      # linux/sched.h
-Quartet = namedtuple("Quartet", ["src_ip", "dst_ip", "src_port", "dst_port"])
 
+class Quartet(object):
+    def __init__(self, src_ip, dst_ip, src_port, dst_port):
+        self.src_ip = src_ip
+        self.dst_ip = dst_ip
+        self.src_port = src_port
+        self.dst_port = dst_port
+
+    def __str__(self):
+        return '{0}:{1} -> {2}:{3}'.format(
+            self.src_ip, self.src_port, self.dst_ip, self.dst_port)
 
 class BaseEvent(ct.Structure):
     _fields_ = [
@@ -45,10 +56,16 @@ class Event(object):
     def __init__(self, data):
         event = ct.cast(data, ct.POINTER(BaseEvent)).contents
         q = Quartet(
-            event.saddr,
-            event.daddr,
+            inet_ntop(AF_INET6, event.saddr),
+            inet_ntop(AF_INET6, event.daddr),
             event.ports >> 32,
             event.ports & 0xffffffff,
         )
         self.quartet = q
         self.base_event = event
+        if event.event_type == 0:
+            self.action = 'register'
+        elif event.event_type == 1:
+            self.action = 'unregister'
+        elif event.event_type == 2:
+            self.action = 'publish'
