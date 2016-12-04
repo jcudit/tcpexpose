@@ -53,7 +53,12 @@ class BaseEvent(ct.Structure):
 
 
 class Event(object):
-    def __init__(self, data):
+    def __init__(self):
+        self.quartet = None
+        self.base_event = None
+        self.action = None
+
+    def setBaseEvent(self, data):
         event = ct.cast(data, ct.POINTER(BaseEvent)).contents
         q = Quartet(
             inet_ntop(AF_INET6, event.saddr),

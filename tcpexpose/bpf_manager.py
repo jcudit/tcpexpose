@@ -64,7 +64,8 @@ def _receive_event(ipc_manager_mailbox, cpu, data, size):
     #     inet_ntop(AF_INET6, ev.daddr), ev.ports & 0xffffffff,
     #     float(ev.delta_us) / 1000)
     # logging.info(line)
-    event = Event(data)
+    event = Event()
+    event.setBaseEvent(data)
     if event.action is not None:
         try:
             ipc_manager_mailbox.put_nowait(event)

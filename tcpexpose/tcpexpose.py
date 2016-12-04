@@ -7,6 +7,7 @@ from ipc_manager import IPCManager
 def command_line_runner():
     logging.basicConfig(level=logging.INFO)
     # TODO: Parse comm filter
+    # TODO: Signal handler to close up IPC socket
     loop = asyncio.get_event_loop()
     ipcman = IPCManager(loop)
     loop.create_task(ipcman.run())
