@@ -1,6 +1,7 @@
+import json
+import ctypes as ct
 from collections import namedtuple
 from enum import Enum
-import ctypes as ct
 from socket import inet_ntop, AF_INET6
 
 TASK_COMM_LEN = 16      # linux/sched.h
@@ -52,14 +53,23 @@ class BaseEvent(ct.Structure):
     ]
 
 
+# TODO: Remove print statements
 class Event(object):
     def __init__(self):
         self.quartet = None
         self.base_event = None
         self.action = None
+        self.json = None
 
     def setBaseEvent(self, data):
         event = ct.cast(data, ct.POINTER(BaseEvent)).contents
+
+        flds = {field[0]: getattr(event, field[0]) for field in event._fields_}
+        flds['dport'] = flds['ports'] >> 32
+        flds['sport'] = flds['ports']  & 0xffffffff
+        self.json = json.dumps(flds, default=self.serializer, sort_keys=True)
+        print(self.json)
+
         q = Quartet(
             inet_ntop(AF_INET6, event.saddr),
             inet_ntop(AF_INET6, event.daddr),
@@ -68,9 +78,21 @@ class Event(object):
         )
         self.quartet = q
         self.base_event = event
+
         if event.event_type == 0:
             self.action = 'register'
         elif event.event_type == 1:
             self.action = 'unregister'
         elif event.event_type == 2:
             self.action = 'publish'
+
+    def serializer(self, o):
+        if isinstance(o, bytes):
+            return str(o)
+        try:
+           iterable = iter(o)
+        except TypeError:
+           pass
+        else:
+           return inet_ntop(AF_INET6, bytes(o))
+        return JSONEncoder.default(self, o)

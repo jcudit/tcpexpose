@@ -2,7 +2,7 @@ import asyncio
 
 from utils import Event, Quartet
 
-
+# TODO: Remove print statements
 class IPCManager(object):
 
     def __init__(self, loop):
@@ -39,7 +39,9 @@ class IPCManager(object):
                     print('flushing {0}'.format(len(self.traces[str(event.quartet)])))
                     if str(event.quartet) in self.traces:
                         while len(self.traces[str(event.quartet)]) != 0:
-                            trace = self.traces[str(event.quartet)].pop(0)
+                            base_event = self.traces[str(event.quartet)].pop(0)
+                            print(str(event.quartet))
+                            # TODO: Write out traces
                 except KeyError:
                     pass
 
