@@ -6,6 +6,7 @@ from socket import inet_ntop, AF_INET6
 
 TASK_COMM_LEN = 16      # linux/sched.h
 
+
 class Quartet(object):
     def __init__(self, src_ip, dst_ip, src_port, dst_port):
         self.src_ip = src_ip
@@ -17,16 +18,17 @@ class Quartet(object):
         return '{0}:{1} -> {2}:{3}'.format(
             self.src_ip, self.src_port, self.dst_ip, self.dst_port)
 
+
 class BaseEvent(ct.Structure):
     _fields_ = [
+        ("event_type", ct.c_ulonglong),
         ("ts_us", ct.c_ulonglong),
-        ("pid", ct.c_ulonglong),
+        # ("pid", ct.c_ulonglong),
         ("saddr", ct.c_ulonglong * 2),
         ("daddr", ct.c_ulonglong * 2),
-        ("event_type", ct.c_ulonglong),
         ("ports", ct.c_ulonglong),
-        ("delta_us", ct.c_ulonglong),
-        ("task", ct.c_char * TASK_COMM_LEN),
+        # ("delta_us", ct.c_ulonglong),
+        # ("task", ct.c_char * TASK_COMM_LEN),
         # Throughput
         ("rx_b", ct.c_ulonglong),
         ("tx_b", ct.c_ulonglong),
@@ -87,8 +89,8 @@ class Event(object):
             self.action = 'publish'
 
     def serializer(self, o):
-        if isinstance(o, bytes):
-            return str(o)
+        # if isinstance(o, bytes):
+        #     return str(o)
         try:
            iterable = iter(o)
         except TypeError:

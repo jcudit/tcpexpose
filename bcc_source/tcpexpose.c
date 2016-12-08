@@ -10,22 +10,12 @@ enum {
     PUBLISH,
 };
 
-struct info_t {
-    u64 ts;
-    u64 pid;
-    char task[TASK_COMM_LEN];
-};
-BPF_HASH(start, struct sock *, struct info_t);
-
 struct event_data_t {
+    u64 event_type;
     u64 ts_us;
-    u64 pid;
     unsigned __int128 saddr;
     unsigned __int128 daddr;
-    u64 event_type;
     u64 ports;
-    u64 delta_us;
-    char task[TASK_COMM_LEN];
 
     // Throughput
     u64 rx_b;       /* How many inbound bytes were acked */
@@ -56,27 +46,22 @@ BPF_PERF_OUTPUT(events);
 
 int trace_tcp_rcv_established(struct pt_regs *ctx, struct sock *sk)
 {
-    // check start and calculate delta
-    struct info_t *infop = start.lookup(&sk);
-    if (infop == 0) {
-        return 0;   // missed entry or filtered
-    }
-    u64 ts = infop->ts;
     u64 now = bpf_ktime_get_ns();
-
-    // pull in details
-    u16 family = 0;
     u16 dport = sk->__sk_common.skc_dport;
     u16 lport = sk->__sk_common.skc_num;
 
+    // TODO: Filter on relevant traffic (dport?)
+    if ((ntohs(dport) + ((0ULL + lport) << 32)) >> 32 == 22) {
+        return 0;
+    }
+
     struct sock *skp = NULL;
     bpf_probe_read(&skp, sizeof(skp), &sk);
-    bpf_probe_read(&family, sizeof(family), &skp->__sk_common.skc_family);
 
     struct tcp_sock *tp = (struct tcp_sock *)sk;
 
     struct event_data_t event = {
-        .pid = infop->pid, .event_type = PUBLISH,
+        .event_type = PUBLISH,
 
         // Throughput
         .rx_b = tp->bytes_received,
@@ -110,8 +95,6 @@ int trace_tcp_rcv_established(struct pt_regs *ctx, struct sock *sk)
         &skp->__sk_common.skc_v6_daddr.in6_u.u6_addr32);
 
     event.ports = ntohs(dport) + ((0ULL + lport) << 32);
-    event.delta_us = (now - ts) / 1000;
-    __builtin_memcpy(&event.task, infop->task, sizeof(event.task));
     events.perf_submit(ctx, &event, sizeof(event));
 
     return 0;
@@ -130,20 +113,6 @@ int trace_tcp_set_state(struct pt_regs *ctx, struct sock *sk, int newstate)
         return 0;
     }
 
-    // Recover socket state if already tracking
-    struct info_t *infop = start.lookup(&sk);
-    if (infop == 0) {
-        // Begin tracking state if currently untracked
-        u32 pid = bpf_get_current_pid_tgid();
-        struct info_t newinfo = {.pid = pid};
-        newinfo.ts = bpf_ktime_get_ns();
-        bpf_get_current_comm(&newinfo.task, sizeof(newinfo.task));
-        start.update(&sk, &newinfo);
-        infop = &newinfo;
-    }
-    u64 ts = infop->ts;
-    u64 now = bpf_ktime_get_ns();
-
     u64 event_type;
     if (newstate == TCP_ESTABLISHED) {
         event_type = REGISTER;
@@ -151,16 +120,21 @@ int trace_tcp_set_state(struct pt_regs *ctx, struct sock *sk, int newstate)
         event_type = UNREGISTER;
     }
 
-    // pull in details
     u16 dport = sk->__sk_common.skc_dport;
     u16 lport = sk->__sk_common.skc_num;
+    u64 now = bpf_ktime_get_ns();
+
+    // TODO: Filter for relevant traffic (dport?)
+    if ((ntohs(dport) + ((0ULL + lport) << 32)) >> 32 == 22) {
+        return 0;
+    }
 
     struct sock *skp = NULL;
     bpf_probe_read(&skp, sizeof(skp), &sk);
     struct tcp_sock *tp = (struct tcp_sock *)sk;
 
     struct event_data_t event = {
-        .pid = infop->pid, .event_type = event_type,
+        .event_type = event_type,
 
         // Throughput
         .rx_b = tp->bytes_received,
@@ -193,8 +167,6 @@ int trace_tcp_set_state(struct pt_regs *ctx, struct sock *sk, int newstate)
     bpf_probe_read(&event.daddr, sizeof(event.daddr),
         &skp->__sk_common.skc_v6_daddr.in6_u.u6_addr32);
     event.ports = ntohs(dport) + ((0ULL + lport) << 32);
-    event.delta_us = (now - ts) / 1000;
-    __builtin_memcpy(&event.task, infop->task, sizeof(event.task));
     events.perf_submit(ctx, &event, sizeof(event));
 
     return 0;
