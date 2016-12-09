@@ -44,14 +44,18 @@ struct event_data_t {
 };
 BPF_PERF_OUTPUT(events);
 
+// TODO: DRY
 int trace_tcp_rcv_established(struct pt_regs *ctx, struct sock *sk)
 {
     u64 now = bpf_ktime_get_ns();
     u16 dport = sk->__sk_common.skc_dport;
     u16 lport = sk->__sk_common.skc_num;
 
-    // TODO: Filter on relevant traffic (dport?)
+    // TODO: Filter on relevant traffic (sport/dport?)
     if ((ntohs(dport) + ((0ULL + lport) << 32)) >> 32 == 22) {
+        return 0;
+    }
+    if ((ntohs(dport) + ((0ULL + lport) << 32)) & 0xffffffff == 22) {
         return 0;
     }
 
@@ -100,6 +104,7 @@ int trace_tcp_rcv_established(struct pt_regs *ctx, struct sock *sk)
     return 0;
 };
 
+// TODO: DRY
 int trace_tcp_set_state(struct pt_regs *ctx, struct sock *sk, int newstate)
 {
 
@@ -124,8 +129,11 @@ int trace_tcp_set_state(struct pt_regs *ctx, struct sock *sk, int newstate)
     u16 lport = sk->__sk_common.skc_num;
     u64 now = bpf_ktime_get_ns();
 
-    // TODO: Filter for relevant traffic (dport?)
+    // TODO: Filter for relevant traffic (sport/dport?)
     if ((ntohs(dport) + ((0ULL + lport) << 32)) >> 32 == 22) {
+        return 0;
+    }
+    if ((ntohs(dport) + ((0ULL + lport) << 32)) & 0xffffffff == 22) {
         return 0;
     }
 

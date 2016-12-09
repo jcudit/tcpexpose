@@ -62,13 +62,14 @@ class Event(object):
         self.base_event = None
         self.action = None
         self.json = None
+        self.transport = None
 
     def setBaseEvent(self, data):
         event = ct.cast(data, ct.POINTER(BaseEvent)).contents
 
         flds = {field[0]: getattr(event, field[0]) for field in event._fields_}
         flds['dport'] = flds['ports'] >> 32
-        flds['sport'] = flds['ports']  & 0xffffffff
+        flds['sport'] = flds['ports'] & 0xffffffff
         self.json = json.dumps(flds, default=self.serializer, sort_keys=True)
         print(self.json)
 
@@ -89,12 +90,10 @@ class Event(object):
             self.action = 'publish'
 
     def serializer(self, o):
-        # if isinstance(o, bytes):
-        #     return str(o)
         try:
-           iterable = iter(o)
+            iterable = iter(o)
         except TypeError:
-           pass
+            pass
         else:
-           return inet_ntop(AF_INET6, bytes(o))
+            return inet_ntop(AF_INET6, bytes(o))
         return JSONEncoder.default(self, o)

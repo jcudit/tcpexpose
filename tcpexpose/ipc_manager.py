@@ -2,6 +2,7 @@ import asyncio
 
 from utils import Event, Quartet
 
+
 # TODO: Remove print statements
 class IPCManager(object):
 
@@ -28,20 +29,19 @@ class IPCManager(object):
             elif event.action == 'publish':
                 if str(event.quartet) in self.traces:
                     try:
-                        self.traces[str(event.quartet)].append(event.base_event)
-                        print('publish {0}'.format(len(self.traces[str(event.quartet)])))
+                        self.traces[str(event.quartet)].append(event.json)
+                        print('publish {0}'.format(
+                            len(self.traces[str(event.quartet)])))
                     except KeyError:
                         pass
             elif event.action == 'flush':
                 print('flushing {0}'.format(str(event.quartet)))
                 print(self.traces.keys())
                 try:
-                    print('flushing {0}'.format(len(self.traces[str(event.quartet)])))
                     if str(event.quartet) in self.traces:
                         while len(self.traces[str(event.quartet)]) != 0:
-                            base_event = self.traces[str(event.quartet)].pop(0)
-                            print(str(event.quartet))
-                            # TODO: Write out traces
+                            json_event = self.traces[str(event.quartet)].pop(0)
+                            event.transport.write(json_event.encode())
                 except KeyError:
                     pass
 
@@ -64,17 +64,13 @@ class IPCProtocol(asyncio.Protocol):
             event = Event()
             event.action = 'flush'
             event.quartet = quartet
+            event.transport = self.transport
 
             try:
                 self.ipc_manager_mailbox.put_nowait(event)
             except QueueEmpty:
                 # TODO: Increment metric
                 pass
-
-            print('Send: {!r}'.format(str(quartet)))
-            self.transport.write(data)
-        else:
-            print(message.split())
 
     def eof_received(self):
         print('Close the client socket')
