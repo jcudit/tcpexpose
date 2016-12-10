@@ -55,7 +55,7 @@ int trace_tcp_rcv_established(struct pt_regs *ctx, struct sock *sk)
     if ((ntohs(dport) + ((0ULL + lport) << 32)) >> 32 == 22) {
         return 0;
     }
-    if ((ntohs(dport) + ((0ULL + lport) << 32)) & 0xffffffff == 22) {
+    if (((ntohs(dport) + ((0ULL + lport) << 32)) & 0xffffffff) == 22) {
         return 0;
     }
 
@@ -133,7 +133,7 @@ int trace_tcp_set_state(struct pt_regs *ctx, struct sock *sk, int newstate)
     if ((ntohs(dport) + ((0ULL + lport) << 32)) >> 32 == 22) {
         return 0;
     }
-    if ((ntohs(dport) + ((0ULL + lport) << 32)) & 0xffffffff == 22) {
+    if (((ntohs(dport) + ((0ULL + lport) << 32)) & 0xffffffff) == 22) {
         return 0;
     }
 
