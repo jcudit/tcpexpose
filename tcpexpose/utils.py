@@ -18,6 +18,10 @@ class Quartet(object):
         return '{0}:{1} -> {2}:{3}'.format(
             self.src_ip, self.src_port, self.dst_ip, self.dst_port)
 
+    def revstr(self):
+        return '{0}:{1} -> {2}:{3}'.format(
+            self.dst_ip, self.dst_port, self.src_ip, self.src_port)
+
 
 class BaseEvent(ct.Structure):
     _fields_ = [

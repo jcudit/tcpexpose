@@ -39,10 +39,14 @@ class IPCManager(object):
                 print(self.traces.keys())
                 try:
                     if str(event.quartet) in self.traces:
-                        while len(self.traces[str(event.quartet)]) != 0:
-                            json_event = self.traces[str(event.quartet)].pop(0)
-                            event.transport.write(json_event.encode())
+                        quartets = [str(event.quartet), event.quartet.revstr()]
+                        for quartet in quartets:
+                            while len(self.traces[quartet]) != 0:
+                                json_event = self.traces[quartet].pop(0)
+                                event.transport.write(json_event.encode())
+                                event.transport.write('\n'.encode())
                 except KeyError:
+                    # TODO: Increment something
                     pass
 
 
